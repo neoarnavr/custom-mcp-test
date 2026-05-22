@@ -1,17 +1,19 @@
 from mcp.server.fastmcp import FastMCP
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+from starlette.responses import PlainTextResponse
 from datetime import datetime
+import uvicorn
 import uuid
 import os
 
 mcp = FastMCP(
     name="QA Test Management MCP",
-    host="0.0.0.0",
-    port=int(os.environ.get("PORT", 8000)),
     stateless_http=True,
 )
 
 # ---------------------------------------------------------------------------
-# In-memory store — simulates a test management DB
+# In-memory store
 # ---------------------------------------------------------------------------
 test_cases = {
     "TC-001": {
@@ -20,12 +22,7 @@ test_cases = {
         "module": "Authentication",
         "priority": "High",
         "status": "Active",
-        "steps": [
-            "Navigate to login page",
-            "Enter valid username and password",
-            "Click Login button",
-            "Verify dashboard is displayed"
-        ],
+        "steps": ["Navigate to login page", "Enter valid username and password", "Click Login button", "Verify dashboard is displayed"],
         "expected_result": "User is redirected to dashboard",
         "created_by": "arnav",
         "created_at": "2025-01-10"
@@ -36,12 +33,7 @@ test_cases = {
         "module": "Authentication",
         "priority": "High",
         "status": "Active",
-        "steps": [
-            "Navigate to login page",
-            "Enter invalid username and password",
-            "Click Login button",
-            "Verify error message is displayed"
-        ],
+        "steps": ["Navigate to login page", "Enter invalid username and password", "Click Login button", "Verify error message is displayed"],
         "expected_result": "Error message 'Invalid credentials' is shown",
         "created_by": "arnav",
         "created_at": "2025-01-10"
@@ -52,13 +44,7 @@ test_cases = {
         "module": "Authentication",
         "priority": "Medium",
         "status": "Active",
-        "steps": [
-            "Click Forgot Password on login page",
-            "Enter registered email",
-            "Check email for reset link",
-            "Set new password",
-            "Login with new password"
-        ],
+        "steps": ["Click Forgot Password on login page", "Enter registered email", "Check email for reset link", "Set new password", "Login with new password"],
         "expected_result": "User can login with new password",
         "created_by": "arnav",
         "created_at": "2025-01-11"
@@ -69,13 +55,7 @@ test_cases = {
         "module": "Payments",
         "priority": "Critical",
         "status": "Active",
-        "steps": [
-            "Add item to cart",
-            "Proceed to checkout",
-            "Enter valid card details",
-            "Confirm order",
-            "Verify order confirmation page"
-        ],
+        "steps": ["Add item to cart", "Proceed to checkout", "Enter valid card details", "Confirm order", "Verify order confirmation page"],
         "expected_result": "Order is placed and confirmation email is sent",
         "created_by": "arnav",
         "created_at": "2025-01-12"
@@ -86,12 +66,7 @@ test_cases = {
         "module": "Performance",
         "priority": "Medium",
         "status": "Draft",
-        "steps": [
-            "Simulate 100 concurrent users",
-            "Hit /api/products endpoint",
-            "Measure response times",
-            "Check for errors"
-        ],
+        "steps": ["Simulate 100 concurrent users", "Hit /api/products endpoint", "Measure response times", "Check for errors"],
         "expected_result": "Response time < 2s for 95th percentile",
         "created_by": "arnav",
         "created_at": "2025-01-13"
@@ -169,17 +144,14 @@ def list_test_cases(module: str = "", priority: str = "", status: str = "") -> s
     status: Active, Draft (leave empty for all)
     """
     filtered = list(test_cases.values())
-
     if module:
         filtered = [tc for tc in filtered if tc["module"].lower() == module.lower()]
     if priority:
         filtered = [tc for tc in filtered if tc["priority"].lower() == priority.lower()]
     if status:
         filtered = [tc for tc in filtered if tc["status"].lower() == status.lower()]
-
     if not filtered:
         return "No test cases found matching the given filters."
-
     lines = [f"Found {len(filtered)} test case(s):\n"]
     for tc in filtered:
         lines.append(f"  {tc['id']} | [{tc['priority']}] {tc['title']} | Module: {tc['module']} | Status: {tc['status']}")
@@ -207,7 +179,7 @@ def create_test_case(title: str, module: str, priority: str, steps: str, expecte
         "created_by": "copilot-agent",
         "created_at": datetime.now().strftime("%Y-%m-%d")
     }
-    return f"Test case created successfully!\nID: {new_id}\nTitle: {title}\nModule: {module}\nPriority: {priority}\nStatus: Draft"
+    return f"Test case created!\nID: {new_id}\nTitle: {title}\nModule: {module}\nPriority: {priority}\nStatus: Draft"
 
 
 @mcp.tool()
@@ -236,11 +208,9 @@ def create_test_run(name: str, test_case_ids: str) -> str:
     """
     run_id = f"RUN-{str(uuid.uuid4())[:8].upper()}"
     tc_ids = [t.strip().upper() for t in test_case_ids.split(",")]
-
     invalid = [t for t in tc_ids if t not in test_cases]
     if invalid:
         return f"Invalid test case IDs: {', '.join(invalid)}"
-
     test_runs[run_id] = {
         "id": run_id,
         "name": name,
@@ -269,13 +239,9 @@ def update_test_run_result(run_id: str, test_case_id: str, result: str) -> str:
     tc_id = test_case_id.upper()
     if tc_id not in run["results"]:
         return f"Test case '{tc_id}' not part of run '{run_id}'."
-
     run["results"][tc_id] = result
-
-    # Auto-close run if all results filled
     if all(v != "Pending" for v in run["results"].values()):
         run["status"] = "Completed"
-
     return f"Updated {tc_id} in {run_id}: result set to '{result}'"
 
 
@@ -285,31 +251,25 @@ def get_test_run_summary(run_id: str) -> str:
     run = test_runs.get(run_id.upper())
     if not run:
         return f"Test run '{run_id}' not found."
-
     results = run["results"]
     counts = {"Pass": 0, "Fail": 0, "Blocked": 0, "Skipped": 0, "Pending": 0}
     for r in results.values():
         counts[r] = counts.get(r, 0) + 1
-
     total = len(results)
     pass_rate = round((counts["Pass"] / total) * 100) if total > 0 else 0
-
-    lines = [
-        f"Run ID: {run['id']}",
-        f"Name: {run['name']}",
-        f"Status: {run['status']}",
-        f"Created: {run['created_at']}",
-        f"",
-        f"Results ({total} total):",
-        f"  ✅ Pass:    {counts['Pass']}",
-        f"  ❌ Fail:    {counts['Fail']}",
-        f"  🚫 Blocked: {counts['Blocked']}",
-        f"  ⏭  Skipped: {counts['Skipped']}",
-        f"  ⏳ Pending: {counts['Pending']}",
-        f"",
+    return (
+        f"Run ID: {run['id']}\n"
+        f"Name: {run['name']}\n"
+        f"Status: {run['status']}\n"
+        f"Created: {run['created_at']}\n\n"
+        f"Results ({total} total):\n"
+        f"  Pass:    {counts['Pass']}\n"
+        f"  Fail:    {counts['Fail']}\n"
+        f"  Blocked: {counts['Blocked']}\n"
+        f"  Skipped: {counts['Skipped']}\n"
+        f"  Pending: {counts['Pending']}\n\n"
         f"Pass Rate: {pass_rate}%"
-    ]
-    return "\n".join(lines)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -325,17 +285,14 @@ def list_defects(severity: str = "", status: str = "", module: str = "") -> str:
     module: Authentication, Payments, Performance
     """
     filtered = list(defects.values())
-
     if severity:
         filtered = [d for d in filtered if d["severity"].lower() == severity.lower()]
     if status:
         filtered = [d for d in filtered if d["status"].lower() == status.lower()]
     if module:
         filtered = [d for d in filtered if d["module"].lower() == module.lower()]
-
     if not filtered:
         return "No defects found matching the given filters."
-
     lines = [f"Found {len(filtered)} defect(s):\n"]
     for d in filtered:
         lines.append(f"  {d['id']} | [{d['severity']}] {d['title']} | Status: {d['status']} | Module: {d['module']}")
@@ -362,7 +319,7 @@ def create_defect(title: str, severity: str, module: str, description: str, link
         "description": description
     }
     return (
-        f"Defect logged successfully!\n"
+        f"Defect logged!\n"
         f"ID: {new_id}\n"
         f"Title: {title}\n"
         f"Severity: {severity}\n"
@@ -392,14 +349,11 @@ def get_qa_summary() -> str:
     total_tc = len(test_cases)
     active_tc = sum(1 for tc in test_cases.values() if tc["status"] == "Active")
     draft_tc = sum(1 for tc in test_cases.values() if tc["status"] == "Draft")
-
     total_defects = len(defects)
     open_defects = sum(1 for d in defects.values() if d["status"] == "Open")
     critical_defects = sum(1 for d in defects.values() if d["severity"] == "Critical" and d["status"] != "Closed")
     in_progress = sum(1 for d in defects.values() if d["status"] == "In Progress")
-
     total_runs = len(test_runs)
-
     return (
         f"======= QA Health Summary =======\n"
         f"\nTest Cases ({total_tc} total):\n"
@@ -415,18 +369,19 @@ def get_qa_summary() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Health check endpoint
+# Health check + Starlette app
 # ---------------------------------------------------------------------------
-from starlette.responses import JSONResponse
-from starlette.routing import Route
-
 async def health(request):
-    return JSONResponse({"status": "ok"})
+    return PlainTextResponse("healthy")
 
-mcp.settings.custom_routes = [Route("/health", endpoint=health)]
 
-# ---------------------------------------------------------------------------
-# Run
-# ---------------------------------------------------------------------------
+app = Starlette(
+    routes=[
+        Route("/health", health),
+        Mount("/", app=mcp.streamable_http_app()),
+    ]
+)
+
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
