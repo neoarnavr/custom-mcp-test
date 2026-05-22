@@ -372,6 +372,7 @@ def get_qa_summary() -> str:
 # Health check + Starlette app
 # ---------------------------------------------------------------------------
 from starlette.routing import Router
+import contextlib
 
 @contextlib.asynccontextmanager
 async def lifespan(app):
