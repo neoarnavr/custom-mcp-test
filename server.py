@@ -371,26 +371,23 @@ def get_qa_summary() -> str:
 # ---------------------------------------------------------------------------
 # Health check + Starlette app
 # ---------------------------------------------------------------------------
-import contextlib
-
-async def health(request):
-    return PlainTextResponse("healthy")
-
+from starlette.routing import Router
 
 @contextlib.asynccontextmanager
 async def lifespan(app):
     async with mcp.session_manager.run():
         yield
 
+async def health(request):
+    return PlainTextResponse("healthy")
 
-app = Starlette(
-    lifespan=lifespan,
-    routes=[
-        Route("/health", health),
-        Mount("/mcp", app=mcp.streamable_http_app()),
-    ],
-    redirect_slashes=False,  # ← add this
-)
+router = Router(routes=[
+    Route("/health", health),
+    Mount("/mcp", app=mcp.streamable_http_app()),
+], redirect_slashes=False)
+
+app = Starlette(lifespan=lifespan)
+app.router = router
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
