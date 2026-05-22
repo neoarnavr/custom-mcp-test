@@ -415,6 +415,17 @@ def get_qa_summary() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Health check endpoint
+# ---------------------------------------------------------------------------
+from starlette.responses import JSONResponse
+from starlette.routing import Route
+
+async def health(request):
+    return JSONResponse({"status": "ok"})
+
+mcp.settings.custom_routes = [Route("/health", endpoint=health)]
+
+# ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
