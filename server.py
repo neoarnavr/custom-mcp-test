@@ -1,11 +1,12 @@
 from mcp.server.fastmcp import FastMCP
 from datetime import datetime
 import uuid
+import os
 
 mcp = FastMCP(
     name="QA Test Management MCP",
     host="0.0.0.0",
-    port=8000,
+    port=int(os.environ.get("PORT", 8000)),
     stateless_http=True,
 )
 
