@@ -371,17 +371,27 @@ def get_qa_summary() -> str:
 # ---------------------------------------------------------------------------
 # Health check + Starlette app
 # ---------------------------------------------------------------------------
+import contextlib
+
 async def health(request):
     return PlainTextResponse("healthy")
 
 
+@contextlib.asynccontextmanager
+async def lifespan(app):
+    async with mcp.session_manager.run():
+        yield
+
+
 app = Starlette(
+    lifespan=lifespan,
     routes=[
         Route("/health", health),
-        Mount("/", app=mcp.streamable_http_app()),
+        Mount("/mcp", app=mcp.streamable_http_app()),
     ]
 )
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
