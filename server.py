@@ -388,7 +388,8 @@ app = Starlette(
     routes=[
         Route("/health", health),
         Mount("/mcp", app=mcp.streamable_http_app()),
-    ]
+    ],
+    redirect_slashes=False,  # ← add this
 )
 
 if __name__ == "__main__":
