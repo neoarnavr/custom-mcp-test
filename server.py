@@ -1,4 +1,5 @@
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.responses import PlainTextResponse
@@ -10,6 +11,9 @@ import os
 mcp = FastMCP(
     name="QA Test Management MCP",
     stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
 )
 
 # ---------------------------------------------------------------------------
