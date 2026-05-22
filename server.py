@@ -4,7 +4,6 @@ import uuid
 
 mcp = FastMCP(
     name="QA Test Management MCP",
-    description="Manage test cases, test runs, and defects for QA teams.",
     host="0.0.0.0",
     port=8000,
     stateless_http=True,
